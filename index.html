@@ -17,161 +17,16 @@
 </head>
 <body>
   <div class="container">
-    <h1>Pose Similarity — Web 版</h1>
-    <p class="notice">說明：允許網站使用攝影機後，畫面會顯示即時骨架，按「捕捉目標」設定目標姿勢，按「開始比對」開始即時分數。</p>
-
-    <div class="row">
-      <video id="video" playsinline autoplay muted width="640" height="480" style="background:#000"></video>
-      <canvas id="output" width="640" height="480"></canvas>
-    </div>
+    <h1>Emotion Recognition — 靜態演示</h1>
+    <p class="notice">已更新：本網站僅保留「情緒辨識」遊戲，點選下方按鈕進入。</p>
 
     <div class="controls">
-      <button id="capture">捕捉目標</button>
-      <button id="start">開始比對</button>
-      <button id="stop">停止</button>
-      <span class="score" id="score">分數：—</span>
+      <a href="emotion-game.html"><button>進入：情緒辨識</button></a>
+      <a href="./"><button>重新整理</button></a>
     </div>
 
-    <p class="notice">備註：此頁使用 MediaPipe Pose Web 版本，瀏覽器需支援攝影機與 HTTPS 環境（或本機 http://localhost）。</p>
+    <p class="notice">備註：請在本機啟動簡易伺服器（`python -m http.server`）或在 HTTPS 網域下開啟以存取攝影機。</p>
   </div>
 
-  <!-- MediaPipe JS (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
-
-  <script>
-    const videoElement = document.getElementById('video');
-    const canvasElement = document.getElementById('output');
-    const ctx = canvasElement.getContext('2d');
-    const captureBtn = document.getElementById('capture');
-    const startBtn = document.getElementById('start');
-    const stopBtn = document.getElementById('stop');
-    const scoreEl = document.getElementById('score');
-
-    let camera = null;
-    let targetVector = null;
-    let running = false;
-
-    // Normalize landmarks: use hip midpoint as origin, scale by max distance
-    function normalizeLandmarks(landmarks){
-      if(!landmarks || landmarks.length===0) return null;
-      const coords = landmarks.map(l=>[l.x, l.y]);
-      const leftHip = coords[mpPose.PoseLandmark.LEFT_HIP];
-      const rightHip = coords[mpPose.PoseLandmark.RIGHT_HIP];
-      if(!leftHip || !rightHip) return null;
-      const origin = [(leftHip[0]+rightHip[0])/2, (leftHip[1]+rightHip[1])/2];
-      const shifted = coords.map(p=>[p[0]-origin[0], p[1]-origin[1]]);
-      const dists = shifted.map(p=>Math.hypot(p[0], p[1]));
-      const maxd = Math.max(...dists);
-      if(maxd < 1e-6) return null;
-      const norm = [].concat(...shifted.map(p=>[p[0]/maxd, p[1]/maxd]));
-      return norm; // length: 66
-    }
-
-    function cosineSimilarity(a,b){
-      if(!a || !b || a.length!==b.length) return 0;
-      let dot=0, na=0, nb=0;
-      for(let i=0;i<a.length;i++){
-        dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i];
-      }
-      const denom = Math.sqrt(na)*Math.sqrt(nb);
-      if(denom < 1e-8) return 0;
-      return Math.max(-1, Math.min(1, dot/denom));
-    }
-
-    // Simple smoothing (moving average)
-    const scoreBuffer = [];
-    function smoothScore(val, window=10){
-      scoreBuffer.push(val);
-      if(scoreBuffer.length>window) scoreBuffer.shift();
-      return scoreBuffer.reduce((s,x)=>s+x,0)/scoreBuffer.length;
-    }
-
-    // Initialize MediaPipe Pose
-    const pose = new mpPose.Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
-    pose.setOptions({modelComplexity:1, smoothLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5});
-
-    pose.onResults((results)=>{
-      // draw
-      ctx.save();
-      ctx.clearRect(0,0,canvasElement.width, canvasElement.height);
-      ctx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-      if(results.poseLandmarks){
-        mpDrawingUtils.drawConnectors(ctx, results.poseLandmarks, mpPose.POSE_CONNECTIONS, {color:'#00FF00', lineWidth:2});
-        mpDrawingUtils.drawLandmarks(ctx, results.poseLandmarks, {color:'#FF0000', lineWidth:1, radius:2});
-      }
-
-      if(running && results.poseLandmarks){
-        const liveVec = normalizeLandmarks(results.poseLandmarks);
-        if(liveVec && targetVector){
-          const sim = cosineSimilarity(targetVector, liveVec);
-          const score = Math.round((sim+1)/2*100);
-          const smooth = Math.round(smoothScore(score));
-          scoreEl.textContent = `分數：${smooth}`;
-          if(smooth >= 80){
-            // visual feedback
-            ctx.fillStyle = 'rgba(0,255,0,0.2)';
-            ctx.fillRect(0,0,canvasElement.width, canvasElement.height);
-          }
-        }
-      }
-
-      ctx.restore();
-    });
-
-    // Start camera using MediaPipe CameraUtils
-    async function startCamera(){
-      if(typeof Camera === 'undefined'){
-        console.error('Camera util missing');
-        return;
-      }
-      camera = new Camera(videoElement, {
-        onFrame: async ()=>{ await pose.send({image: videoElement}); },
-        width: 640,
-        height: 480
-      });
-      camera.start();
-    }
-
-    // Buttons
-    captureBtn.addEventListener('click', ()=>{
-      if(!pose) return;
-      // capture current frame landmarks by running one evaluation
-      // The pose.onResults callback will run; we need last landmarks
-      // Simplest: run a single send and store last landmarks via a temporary handler
-      alert('請保持姿勢，稍後自動捕捉（約 1 秒）');
-      let tmpHandler = (results)=>{
-        if(results.poseLandmarks){
-          const v = normalizeLandmarks(results.poseLandmarks);
-          if(v) targetVector = v;
-          alert('已捕捉目標姿勢');
-        } else {
-          alert('未偵測到姿勢，請靠近攝影機並重試');
-        }
-        pose.onResults(mainHandler);
-      };
-      // swap handler
-      const mainHandler = pose._callbacks['results'] ? pose._callbacks['results'][0] : null; // try to save
-      // set temporary handler
-      pose.onResults(tmpHandler);
-      // send one frame
-      pose.send({image: videoElement});
-    });
-
-    startBtn.addEventListener('click', ()=>{ if(!targetVector){ alert('尚未設定目標姿勢，請先按「捕捉目標」。'); return;} running=true; scoreBuffer.length=0; scoreEl.textContent='分數：0'; });
-    stopBtn.addEventListener('click', ()=>{ running=false; scoreEl.textContent='分數：—'; });
-
-    // start camera on page load
-    (async ()=>{
-      try{
-        await startCamera();
-      }catch(err){
-        console.error(err);
-        alert('啟動攝影機失敗，請確認瀏覽器有權限且本站在安全（https 或 localhost）');
-      }
-    })();
-
-  </script>
 </body>
 </html>

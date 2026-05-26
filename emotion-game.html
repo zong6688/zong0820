@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表情情緒辨識 | Vision Arcade</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="game-body">
+    <div class="game-page">
+        <header class="game-topbar">
+            <div class="topbar-left">
+                <a href="index.html" class="back-btn">返回中心</a>
+                <div class="game-title">表情情緒辨識</div>
+            </div>
+            <div class="topbar-right">
+                <div class="metric"><span class="metric-label">主要情緒</span><span class="metric-value" id="m-dominant">--</span></div>
+                <div class="metric"><span class="metric-label">挑戰分</span><span class="metric-value" id="m-challenge">0</span></div>
+                <div class="metric"><span class="metric-label">完成</span><span class="metric-value" id="m-done">0</span></div>
+                <div class="metric"><span class="metric-label">FPS</span><span class="metric-value" id="m-fps">0</span></div>
+            </div>
+        </header>
+
+        <aside class="sidebar">
+            <section>
+                <h3>模式</h3>
+                <div class="toggle-mode">
+                    <button class="active" data-mode="live">即時分析</button>
+                    <button data-mode="challenge">挑戰模式</button>
+                </div>
+                <p id="mode-desc">即時顯示鏡頭中人臉的 7 種情緒比例與主要情緒。</p>
+            </section>
+
+            <section id="challenge-panel" style="display:none;">
+                <h3>當前挑戰</h3>
+                <div class="emotion-challenge">
+                    <div class="target-emoji" id="ch-emoji">😀</div>
+                    <div class="label">請做出</div>
+                    <div class="name" id="ch-name">開心</div>
+                </div>
+                <div class="stat-row" style="margin-top:12px;"><span>達標門檻</span><span>60%</span></div>
+                <div class="stat-row" style="margin-top:8px;"><span>需維持</span><span>1.0 秒</span></div>
+                <div class="stat-row" style="margin-top:8px;"><span>進度</span><span id="ch-progress">0 / 30</span></div>
+            </section>
+
+            <section>
+                <h3>情緒分析</h3>
+                <div class="emotion-list" id="emo-list"></div>
+            </section>
+
+            <section>
+                <h3>操作提示</h3>
+                <div style="color:var(--text-mute); font-size:12px; line-height:1.6;">
+                    1. 讓臉部正對鏡頭，距離 30–60 cm<br>
+                    2. 光線充足效果最佳<br>
+                    3. 挑戰模式下按 <strong>N</strong> 跳過、<strong>R</strong> 重置
+                </div>
+            </section>
+        </aside>
+
+        <main class="stage" id="stage">
+            <video class="cam" id="video" autoplay muted playsinline></video>
+            <canvas class="overlay" id="overlay"></canvas>
+            <div class="hud-pass-flash" id="passFlash"></div>
+            <div class="hud-pass-text" id="passText">GREAT!</div>
+
+            <div class="loading-overlay" id="loading">
+                <div class="loading-content">
+                    <div class="spinner"></div>
+                    <h3>載入情緒辨識模型</h3>
+                    <p>正在下載 face-api.js 模型權重...</p>
+                    <p class="loading-error" id="loading-error"></p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="emotion-game.js"></script>
+</body>
+</html>
